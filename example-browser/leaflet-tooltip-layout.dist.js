@@ -18,45 +18,19 @@
   // events
   let _onPolylineCreated = null; // will be called after polyline has been created
 
-  function initialize(leafletMap, onPolylineCreated) {
+  function initializeTooltipLayout(leafletMap) {
     map = leafletMap;
     polylineList = [];
 
-    //default style
-    if (onPolylineCreated) {
-      _onPolylineCreated = onPolylineCreated;
-    } else {
-      _onPolylineCreated = ply => {
-        ply.setStyle({
-          color: '#90A4AE'
-        });
-      };
-    }
-
-    redrawLines(false);
+    redrawLines();
 
     // event registrations
     map.on('zoomstart', function() {
       removeAllPolyline(map);
     });
-
-    map.on('zoomend', function() {
-      redrawLines(false);
-    });
-
-    map.on('dragend', function() {
-      redrawLines();
-    });
-
-    map.on('resize', function() {
-      redrawLines();
-    });
   }
 
-  function redrawLines(maintainAllPolyline) {
-    if (!maintainAllPolyline) {
-      removeAllPolyline();
-    }
+  function redrawLines() {
     setRandomPos(map);
     layoutByForce();
     setEdgePosition();
@@ -82,7 +56,43 @@
       sticky: 'none',
       opacity: options.opacity
     });
-    markerList.push(marker);
+
+    if (marker.getTooltip()._container !== undefined) {
+      marker.on('mouseover', function () {
+        mouseOverEvent(marker);
+      });
+
+      marker.on('mouseout', function () {
+        mouseOutEvent(marker);
+      });
+
+      markerList.push(marker);
+    }
+  }
+
+  function mouseOverEvent(marker) {
+    if (marker.getTooltip() === undefined || marker.getTooltip() === null) return;
+    var toolTip = marker.getTooltip();
+
+    if (toolTip._container === undefined) return;
+    toolTip._container.style.border = '2px solid #FF0000';
+
+    if (getLine(marker) !== undefined) {
+      getLine(marker).setStyle({color: '#FF0000'});
+    }
+    toolTip.bringToFront();
+  }
+
+  function mouseOutEvent(marker) {
+    if (marker.getTooltip() === undefined || marker.getTooltip() === null) return;
+    var toolTip = marker.getTooltip();
+
+    if (toolTip._container === undefined) return;
+    toolTip._container.style.border = '#000FFF';
+
+    if (getLine(marker) !== undefined) {
+      getLine(marker).setStyle({color: '#000FFF'});
+    }
   }
 
   function getMarkers() {
@@ -101,6 +111,14 @@
     polylineList = [];
   }
 
+  function getAllPolyline() {
+    return polylineList;
+  }
+
+  function removeAllMarkers() {
+    markerList = [];
+  }
+
   /**
    * Draw lines between markers and tooltips
    * @param map leaflet map
@@ -109,8 +127,8 @@
     removeAllPolyline(map);
     for (var i = 0; i < markerList.length; i++) {
       var marker = markerList[i];
-      var markerDom = marker._icon;
-      var markerPosition = getPosition(markerDom);
+      // var markerDom = marker._icon;
+      var markerPosition = getMarkerPosition(marker);
       var label = marker.getTooltip();
 
       var labelDom = label._container;
@@ -139,7 +157,11 @@
             let ply = L.polyline([marker.getLatLng(), destLatLng]);
             _onPolylineCreated && _onPolylineCreated(ply);
             marker.__ply = ply;
+            marker.__ply.addEventListener(marker.getEvents());
             polylineList.push(ply);
+            ply.setStyle({
+              color: '#000FFF'
+            });
             ply.addTo(map);
           })(marker, destLatLng),
           0
@@ -153,8 +175,8 @@
       var marker = markerList[i];
       var label = marker.getTooltip();
       var labelDom = label._container;
-      var markerDom = marker._icon;
-      var markerPosition = getPosition(markerDom);
+      // var markerDom = marker._icon;
+      var markerPosition = getMarkerPosition(marker);
       // var angle = Math.floor(Math.random() * 19 + 1) * 2 * Math.PI / 20;
       var angle = ((2 * Math.PI) / 6) * i;
       var x = markerPosition.x;
@@ -199,6 +221,14 @@
   }
 
   /**
+   * get pixel position of the marker
+   */
+  function getMarkerPosition(el) {
+    var pixelPoint = map.latLngToLayerPoint(el.getLatLng());
+    return L.point(pixelPoint.x, pixelPoint.y);
+  }
+
+  /**
    * t is the temperature in the system
    */
   function computePositionStep(t) {
@@ -210,21 +240,23 @@
     var i;
     var length = markerList.length;
 
-    if (markerList.length >= 150) {
-      length = 150;
+    if (markerList.length >= 400) {
+      length = 400;
     }
 
     for (i = 0; i < length; i++) {
       v = markerList[i];
       // get position of label v
       v.disp = L.point(0, 0);
-      v_pos = getPosition(v.getTooltip()._container);
+      var v_label = v.getTooltip()._container;
+      v_pos = getPosition(v_label);
 
       // compute gravitational force
-      for (var j = 0; j < markerList.length; j++) {
+      for (var j = 0; j < length; j++) {
         var u = markerList[j];
         if (i !== j) {
-          var u_pos = getPosition(u.getTooltip()._container);
+          var u_label = u.getTooltip()._container;
+          var u_pos = getPosition(u_label);
           dpos = v_pos.subtract(u_pos);
           if (dpos !== 0) {
             v.disp = v.disp.add(
@@ -236,17 +268,17 @@
     }
 
     // compute force between marker and tooltip
-    for (i = 0; i < markerList.length; i++) {
+    for (i = 0; i < length; i++) {
       v = markerList[i];
       v_pos = getPosition(v.getTooltip()._container);
-      dpos = v_pos.subtract(getPosition(v._icon));
+      dpos = v_pos.subtract(getMarkerPosition(v));
       v.disp = v.disp.subtract(
         normalize(dpos).multiplyBy(fa(dpos.distanceTo(L.point(0, 0)), k))
       );
     }
 
     // calculate layout
-    for (i = 0; i < markerList.length; i++) {
+    for (i = 0; i < length; i++) {
       var disp = markerList[i].disp;
       var p = getPosition(markerList[i].getTooltip()._container);
       var d = scaleTo(
@@ -261,7 +293,15 @@
 
   function layoutByForce() {
     var start = Math.ceil(window.innerWidth / 10);
-    var times = 50;
+    var times;
+    if (markerList.length <= 200) {
+      times = 50;
+    } else if (markerList.length > 200 && markerList.length < 400) {
+      times = 10;
+    } else {
+      times = 10;
+    }
+
     var t;
     for (var i = 0; i < times; i += 1) {
       t = start * (1 - i / (times - 1));
@@ -269,7 +309,6 @@
     }
 
     for (i = 0; i < markerList.length; i++) {
-      var disp = markerList[i].disp;
       var p = getPosition(markerList[i].getTooltip()._container);
       var width = markerList[i].getTooltip()._container.offsetWidth;
       var height = markerList[i].getTooltip()._container.offsetHeight;
@@ -282,10 +321,15 @@
     var bounds = map.getBounds();
     var northWest = map.latLngToLayerPoint(bounds.getNorthWest());
     var southEast = map.latLngToLayerPoint(bounds.getSouthEast());
+    var length = markerList.length;
 
-    for (let i = 0; i < markerList.length; i++) {
+    if (markerList.length >= 400) {
+      length = 400;
+    }
+
+    for (let i = 0; i < length; i++) {
       var tooltip = getPosition(markerList[i].getTooltip()._container);
-      var marker = getPosition(markerList[i]._icon);
+      var marker = getMarkerPosition(markerList[i]);
       var width = markerList[i].getTooltip()._container.offsetWidth;
       var height = markerList[i].getTooltip()._container.offsetHeight;
 
@@ -324,13 +368,15 @@
     }
   }
 
-  TooltipLayout['initialize'] = initialize;
+  TooltipLayout['initializeTooltipLayout'] = initializeTooltipLayout;
   TooltipLayout['redrawLines'] = redrawLines;
   TooltipLayout['resetMarker'] = resetMarker;
   TooltipLayout['getMarkers'] = getMarkers;
   TooltipLayout['addMarker'] = addMarker;
   TooltipLayout['getLine'] = getLine;
   TooltipLayout['removeAllPolyline'] = removeAllPolyline;
+  TooltipLayout['removeAllMarkers'] = removeAllMarkers;
+  TooltipLayout['getAllPolyline'] = getAllPolyline;
 
   return TooltipLayout;
 }, window);
