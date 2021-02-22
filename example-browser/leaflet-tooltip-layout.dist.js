@@ -74,8 +74,8 @@
     if (marker.getTooltip() === undefined || marker.getTooltip() === null) return;
     var toolTip = marker.getTooltip();
 
-    if (toolTip._container === undefined) return;
-    toolTip._container.style.border = '2px solid #FF0000';
+    // if (toolTip._container === undefined) return;
+    // toolTip._container.style.border = '2px solid #FF0000';
 
     if (getLine(marker) !== undefined) {
       getLine(marker).setStyle({color: '#FF0000'});
@@ -85,10 +85,10 @@
 
   function mouseOutEvent(marker) {
     if (marker.getTooltip() === undefined || marker.getTooltip() === null) return;
-    var toolTip = marker.getTooltip();
+    // var toolTip = marker.getTooltip();
 
-    if (toolTip._container === undefined) return;
-    toolTip._container.style.border = '#000FFF';
+    // if (toolTip._container === undefined) return;
+    // toolTip._container.style.border = '#000FFF';
 
     if (getLine(marker) !== undefined) {
       getLine(marker).setStyle({color: '#000FFF'});
@@ -299,7 +299,7 @@
     } else if (markerList.length > 200 && markerList.length < 400) {
       times = 10;
     } else {
-      times = 10;
+      times = 1;
     }
 
     var t;
