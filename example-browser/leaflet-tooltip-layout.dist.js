@@ -49,7 +49,7 @@
     marker.bindTooltip(name, {
       pane: options.pane,
       offset: options.offset,
-      classname: 'heading',
+      className: 'tooltip-layout',
       permanent: true,
       interactive: true,
       direction: 'left',
