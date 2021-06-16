@@ -157,7 +157,7 @@
             let ply = L.polyline([marker.getLatLng(), destLatLng]);
             _onPolylineCreated && _onPolylineCreated(ply);
             marker.__ply = ply;
-            marker.__ply.addEventListener(marker.getEvents());
+            // marker.__ply.addEventListener(marker.getEvents());
             polylineList.push(ply);
             ply.setStyle({
               color: '#000FFF'
